@@ -88,7 +88,7 @@ valid_layer_types = [nn.modules.conv.Conv2d, nn.modules.linear.Linear]
 #valid_layer_types = [nn.modules.linear.Linear]
 #valid_layer_types = [nn.modules.conv.Conv2d]
 
-def quantize(model, weight_importance, weight_hessian, valid_ind, n_clusters, is_imagenet):
+def quantize(model, weight_importance, valid_ind, n_clusters, is_imagenet):
     assert len(n_clusters) == len(valid_ind)
     print('==>quantization clusters: {}'.format(n_clusters))
 
@@ -97,7 +97,7 @@ def quantize(model, weight_importance, weight_hessian, valid_ind, n_clusters, is
         if i in valid_ind:
             quantize_layer_size.append([np.prod(layer.weight.size())])
 
-    centroid_label_dict = quantize_model(model, weight_importance, weight_hessian, valid_ind, n_clusters, max_iter=args.max_iter, mode='cpu', is_pruned=args.is_pruned, ha=0.0, diameter_reg = args.diameter_reg, diameter_entropy_reg = args.diameter_entropy_reg)
+    centroid_label_dict = quantize_model(model, weight_importance, weight_importance, valid_ind, n_clusters, max_iter=args.max_iter, mode='cpu', is_pruned=args.is_pruned, ha=0.0, diameter_reg = args.diameter_reg, diameter_entropy_reg = args.diameter_entropy_reg)
 
     #Now get the overall compression rate
     huffman_size = get_huffmaned_weight_size(centroid_label_dict, quantize_layer_size, n_clusters)
@@ -118,7 +118,7 @@ def get_importance(importance_type, index, t=1.0):
         for dims in eval(args.n_hidden):
             pathname += "_"+str(dims)
         pathname += "_"+str(args.output_dims)
-        pathname += "/importances"
+    pathname += "/importances"
     filepath = os.path.join(pathname, filename)
 
     assert os.path.isfile(filepath), "Please check "+filepath+" exists"
@@ -285,7 +285,7 @@ def main():
             for dims in eval(args.n_hidden):
                 pathname += "_"+str(dims)
             pathname += "_"+str(args.output_dims)
-            pathname += "/model"
+        pathname += "/model"
         filepath = os.path.join(pathname, filename)
         assert os.path.isfile(filepath), "Can not find model at "+filepath
 
@@ -317,15 +317,6 @@ def main():
             weight_importance_id = get_importance('normal', i)
             for ix in weight_importance:
                 weight_importance[ix] = weight_importance[ix] + args.mu*weight_importance_id[ix]
-        if args.type in ['mnist', 'cifar10']:
-            #get weight hessian
-            weight_hessian = get_importance('hessian', i, t=args.temperature)
-            weight_hessian_id = get_importance('normal', i)
-            for ix in weight_hessian:
-                weight_hessian[ix] = weight_hessian[ix] + args.mu*weight_hessian_id[ix]
-        else:
-            #TODO: delete this after hessian of cifar100 and alexnet were implemented
-            weight_hessian = get_importance('normal', i)
 
         # eval raw model
 
@@ -337,7 +328,7 @@ def main():
             metrics[4,i], metrics[5,i], metrics[6,i] = eval_and_print(model_raw, val_ds, is_imagenet, is_train=False, prefix_str="Retrained model number %d"%i)
 
         #quantize
-        metrics[0,i], cl_list = quantize(model_raw, weight_importance, weight_hessian, valid_ind, clusters, is_imagenet)
+        metrics[0,i], cl_list = quantize(model_raw, weight_importance, valid_ind, clusters, is_imagenet)
         #print("Quantization, ratio={:.4f}".format(metrics[0,i]))
         if args.type=='synthetic':
             metrics[9,i] = eval_and_print_regression(model_raw, train_ds, is_train=True, prefix_str="After quantization number %d"%i)
@@ -371,7 +362,7 @@ def main():
             perf_inf += "After finetune, type={}, training loss={:.6f}+-{:.6f} \n".format(args.type, np.mean(metrics[15]), np.std(metrics[15]))
             perf_inf += "After finetune, type={}, loss={:.6f}+-{:.6f} \n".format(args.type, np.mean(metrics[18]), np.std(metrics[18]))
     else:
-        perf_inf += "Before quantization, type={}, training acc1={:.4f}+-{:.4f}, acc5={:.4f}+-{:.4f}, loss={:.6f}+-{:.6f}\n ".format(args.type, np.mean(metrics[1]), np.std(metrics[1]), np.mean(metrics[2]), np.std(metrics[2]), np.mean(metrics[3]), np.std(metrics[3]))
+        perf_inf += "Before quantization, type={}, training acc1={:.4f}+-{:.4f}, acc5={:.4f}+-{:.4f}, loss={:.6f}+-{:.6f}\n".format(args.type, np.mean(metrics[1]), np.std(metrics[1]), np.mean(metrics[2]), np.std(metrics[2]), np.mean(metrics[3]), np.std(metrics[3]))
         perf_inf += "Before quantization, type={}, validation acc1={:.4f}+-{:.4f}, acc5={:.4f}+-{:.4f}, loss={:.6f}+-{:.6f}\n".format(args.type, np.mean(metrics[4]), np.std(metrics[4]), np.mean(metrics[5]), np.std(metrics[5]), np.mean(metrics[6]), np.std(metrics[6]))
         perf_inf += "Compression ratio = {:.4f}+-{:.4f}\n".format(np.mean(metrics[0]), np.std(metrics[0]))
         perf_inf += "After quantization, type={}, training acc1={:.4f}+-{:.4f}, acc5={:.4f}+-{:.4f}, loss={:.6f}+-{:.6f} \n".format(args.type, np.mean(metrics[7]), np.std(metrics[7]), np.mean(metrics[8]), np.std(metrics[8]), np.mean(metrics[9]), np.std(metrics[9]))
